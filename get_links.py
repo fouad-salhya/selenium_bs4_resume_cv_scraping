@@ -1,107 +1,96 @@
-import os
-import threading
-import keyboard
 from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import time
+import os
 
-# Configuration de Selenium avec Firefox
+# Setup navigateur
 options = webdriver.FirefoxOptions()
-options.add_argument("--headless")  # Mode sans affichage
-options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
+options.add_argument("--headless")
 driver = webdriver.Firefox(options=options)
+wait = WebDriverWait(driver, 15)
 
+# Fichiers
+profile_file = "profiles.txt"
+last_page_file = "last_page.txt"
 
-os.makedirs(output_dir, exist_ok=True)
+# Lire la dernière page scrappée
+start_page = 1
+if os.path.exists(last_page_file):
+    with open(last_page_file, "r") as f:
+        try:
+            start_page = int(f.read().strip()) + 1  # On reprend à la page suivante
+        except:
+            pass
 
-# Variable de contrôle pour la pause
-pause_event = threading.Event()
-pause_event.set()
+print(f" On démarre à la page {start_page}")
 
-def pause_resume():
-    global pause_event
-    while True:
-        keyboard.wait("enter")  # Attendre que l'utilisateur appuie sur "Entrée"
-        if pause_event.is_set():
-            print("Pause activée. Appuyez sur Entrée pour reprendre.")
-            pause_event.clear()
-        else:
-            print("Reprise du programme.")
-            pause_event.set()
+# Charger la première page
+base_url = "https://www.emploi.ma/recherche-base-donnees-cv/?f%5B0%5D=im_field_candidat_secteur%3A134&f%5B1%5D=im_field_candidat_secteur%3A133&f%5B2%5D=im_field_candidat_secteur%3A146&f%5B3%5D=im_field_candidat_metier%3A31"
+driver.get(base_url)
+time.sleep(4)
 
-# Lancer le thread de contrôle de pause
-threading.Thread(target=pause_resume, daemon=True).start()
+def wait_for_page_button(page_number):
+    try:
+        wait.until(EC.presence_of_element_located((By.LINK_TEXT, str(page_number))))
+        return True
+    except:
+        return False
 
-# Fonction pour extraire et sauvegarder le contenu des profils
-def extract_and_save_profile(profile_url, file_index):
-    driver.get(profile_url)
-    time.sleep(2)  # Attendre le chargement
-    
+def click_page(page_number):
+    if wait_for_page_button(page_number):
+        try:
+            link = driver.find_element(By.LINK_TEXT, str(page_number))
+            link.click()
+            print(f" Clic sur page {page_number}")
+            time.sleep(4)
+            return True
+        except:
+            print(f" Échec clic page {page_number}")
+    return False
+
+def extract_links():
     soup = BeautifulSoup(driver.page_source, 'html.parser')
-    page_content = soup.find('div', class_='page-content')
-    
-    if page_content:
-        container = page_content.find('div', class_='container container-grid')
-        if container:
-            cards = container.find_all('div', class_='card card-block')
-            if len(cards) >= 2:
-                second_card = cards[1]  # Récupérer la 2e div
-                div_content = second_card.find("div", class_="card-block-content")
-                
-                if div_content:
-                    text_content = div_content.get_text("\n", strip=True)  # Garde les retours à la ligne
-                    
-                    file_name = os.path.join(output_dir, f"{file_index}.txt")
-                    with open(file_name, "w", encoding="utf-8") as file:
-                        file.write(text_content)
-                    print(f"Profil {file_index} sauvegardé dans {file_name}")
-                else:
-                    print(f"Erreur : Contenu de la carte introuvable pour {profile_url}")
-            else:
-                print(f"Erreur : Pas assez de cartes pour {profile_url}")
-        else:
-            print(f"Erreur : Conteneur introuvable pour {profile_url}")
+    divs = soup.find_all('div', class_='card-block-contentx')
+    links = []
+    for div in divs:
+        profiles = div.find_all('div', class_='card-profile')
+        for profile in profiles:
+            href = profile.get('data-href')
+            if href:
+                links.append(href)
+    return links
+
+# Aller jusqu’à la page start_page sans scraper
+current_page = 1
+while current_page < start_page:
+    next_page = current_page + 1
+    if click_page(next_page):
+        current_page = next_page
     else:
-        print(f"Erreur : Contenu de la page introuvable pour {profile_url}")
+        print(f" Impossible d’aller à la page {next_page}")
+        driver.quit()
+        exit()
 
-# Fonction pour obtenir le dernier profil scrappé
-def get_last_scraped():
-    if os.path.exists("last_scraped.txt"):
-        with open("last_scraped.txt", "r") as f:
-            return int(f.read().strip())
-    return 0  # Si le fichier n'existe pas, commencer à partir de la première ligne
+# On est à la page de démarrage : maintenant on scrape !
+for page in range(start_page, start_page + 100):  # scraper 100 pages max
+    if click_page(page):
+        time.sleep(2)
 
-# Fonction pour sauvegarder la dernière ligne scrappée
-def save_last_scraped(line_index):
-    with open("last_scraped.txt", "w") as f:
-        f.write(str(line_index))
+        links = extract_links()
+        print(f"Page {page} : {len(links)} liens extraits.")
 
-# Charger les URLs depuis le fichier texte
-with open("profile_urls.txt", "r", encoding="utf-8") as file:
-    profile_urls = file.readlines()
+        with open(profile_file, "a", encoding="utf-8") as f:
+            for link in links:
+                f.write(link + "\n")
 
-# Obtenir la dernière ligne scrappée
-start_index = get_last_scraped()
+        with open(last_page_file, "w") as f:
+            f.write(str(page))
+    else:
+        print(f"Échec chargement de la page {page}")
+        break
 
-# Extraire et sauvegarder les profils
-for index, profile_url in enumerate(profile_urls[start_index:], start=start_index + 1):
-    profile_url = profile_url.strip()  # Supprimer les espaces et retours à la ligne
-    print(f"Scraping le profil {index}: {profile_url}")
-    
-    # Scraper et sauvegarder
-    extract_and_save_profile(profile_url, index)
-    
-    # Sauvegarder l'index de la ligne après chaque scraping réussi
-    save_last_scraped(index)
-    
-    print("Appuyez sur Entrée pour mettre en pause/reprendre.")
-    while not pause_event.is_set():  # Attendre la reprise si le programme est mis en pause
-        time.sleep(1)  # Attendre la reprise
-    
-    time.sleep(10)  # Attendre avant de passer à la page suivante
-
-# Fermer le navigateur
 driver.quit()
-
-print("\nExtraction des profils terminée !")
+print(" Scraping terminé.")
