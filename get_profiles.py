@@ -13,7 +13,7 @@ options.add_argument("user-agent=Mozilla/5.0")
 driver = webdriver.Firefox(options=options)
 
 # === Dossier de sortie ===
-output_dir = "hi"
+output_dir = "data"
 os.makedirs(output_dir, exist_ok=True)
 
 # === Pause/Reprise avec touche Entrée ===

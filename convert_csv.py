@@ -5,7 +5,7 @@ import csv
 dossier_cv = "./data/"
 
 # Fichier CSV de sortie
-fichier_csv = "./clean_cv/data.csv"
+fichier_csv = "./clean_csv/data.csv"
 
 # Liste des mots-clés qui définissent les sections
 mots_cles = [

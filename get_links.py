@@ -12,8 +12,7 @@ options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Apple
 
 driver = webdriver.Firefox(options=options)
 
-# Création du dossier 'data' s'il n'existe pas
-output_dir = "result"
+
 os.makedirs(output_dir, exist_ok=True)
 
 # Variable de contrôle pour la pause
