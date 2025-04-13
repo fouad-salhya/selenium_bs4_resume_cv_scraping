@@ -13,7 +13,7 @@ driver = webdriver.Firefox(options=options)
 wait = WebDriverWait(driver, 15)
 
 # Fichiers
-profile_file = "profiles.txt"
+profile_file = "profile_urls.txt"
 last_page_file = "last_page.txt"
 
 # Lire la dernière page scrappée
