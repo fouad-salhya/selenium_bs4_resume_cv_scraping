@@ -6,9 +6,10 @@ from bs4 import BeautifulSoup
 import time
 import os
 
-# Setup navigateur
+# Configuration du navigateur
 options = webdriver.FirefoxOptions()
 options.add_argument("--headless")
+options.add_argument("user-agent=Mozilla/5.0")
 driver = webdriver.Firefox(options=options)
 wait = WebDriverWait(driver, 15)
 
@@ -21,14 +22,14 @@ start_page = 1
 if os.path.exists(last_page_file):
     with open(last_page_file, "r") as f:
         try:
-            start_page = int(f.read().strip()) + 1  # On reprend à la page suivante
+            start_page = int(f.read().strip()) + 1
         except:
             pass
 
-print(f" On démarre à la page {start_page}")
+print(f"✅ On démarre à la page {start_page}")
 
 # Charger la première page
-base_url = "https://www.emploi.ma/recherche-base-donnees-cv/?f%5B0%5D=im_field_candidat_secteur%3A134&f%5B1%5D=im_field_candidat_secteur%3A133&f%5B2%5D=im_field_candidat_secteur%3A146&f%5B3%5D=im_field_candidat_metier%3A31"
+base_url = "https://www.emploi.ma/recherche-base-donnees-cv/?f%5B0%5D=im_field_candidat_metier%3A1127&f%5B1%5D=im_field_candidat_metier%3A29"
 driver.get(base_url)
 time.sleep(4)
 
@@ -44,11 +45,11 @@ def click_page(page_number):
         try:
             link = driver.find_element(By.LINK_TEXT, str(page_number))
             link.click()
-            print(f" Clic sur page {page_number}")
+            print(f"➡️ Clic sur page {page_number}")
             time.sleep(4)
             return True
         except:
-            print(f" Échec clic page {page_number}")
+            print(f"⚠️ Échec clic page {page_number}")
     return False
 
 def extract_links():
@@ -63,24 +64,23 @@ def extract_links():
                 links.append(href)
     return links
 
-# Aller jusqu’à la page start_page sans scraper
-current_page = 1
-while current_page < start_page:
-    next_page = current_page + 1
-    if click_page(next_page):
-        current_page = next_page
-    else:
-        print(f" Impossible d’aller à la page {next_page}")
-        driver.quit()
-        exit()
+# 💡 Scraper la page actuelle (page de démarrage) sans cliquer
+links = extract_links()
+print(f"✅ Page {start_page} : {len(links)} liens extraits.")
 
-# On est à la page de démarrage : maintenant on scrape !
-for page in range(start_page, start_page + 100):  # scraper 100 pages max
+with open(profile_file, "a", encoding="utf-8") as f:
+    for link in links:
+        f.write(link + "\n")
+
+with open(last_page_file, "w") as f:
+    f.write(str(start_page))
+
+# 🔁 Scraper les pages suivantes
+for page in range(start_page + 1, start_page + 100):
     if click_page(page):
-        time.sleep(2)
-
+        time.sleep(5)
         links = extract_links()
-        print(f"Page {page} : {len(links)} liens extraits.")
+        print(f"✅ Page {page} : {len(links)} liens extraits.")
 
         with open(profile_file, "a", encoding="utf-8") as f:
             for link in links:
@@ -89,8 +89,8 @@ for page in range(start_page, start_page + 100):  # scraper 100 pages max
         with open(last_page_file, "w") as f:
             f.write(str(page))
     else:
-        print(f"Échec chargement de la page {page}")
+        print(f"❌ Échec chargement de la page {page}")
         break
 
 driver.quit()
-print(" Scraping terminé.")
+print("✅ Scraping terminé.")
